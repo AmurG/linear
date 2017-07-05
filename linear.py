@@ -7,7 +7,7 @@ import networkx as nx
 
 def randomgraph(datamat, nsam, nvar):
 	order = np.random.permutation(nvar)
-	edgnum = int(np.rint((np.log(nvar))*(np.log(nvar))+1))
+	edgnum = int(np.rint(np.log(nvar)*np.log(nvar)+1))
 	G = nx.Graph()
 	for i in range(0,nvar):
 		G.add_node(i)
@@ -15,23 +15,21 @@ def randomgraph(datamat, nsam, nvar):
 		curr = order[idx]
 		for i in range(0,edgnum):
 			rand = np.random.randint(0,nvar)
-			count = 0
 			while((rand==curr)or(G.has_edge(rand,curr))or(G.has_edge(curr,rand))):
 				rand = np.random.randint(0,nvar)
-				count = count+1
-				if(count>nvar/2):
-					break
-			G.add_edge(curr,rand,weight=abs(np.corrcoef(datamat[:,curr],datamat[:,rand])))
+			mat = np.corrcoef(datamat[:,curr],datamat[:,rand])
+			G.add_edge(curr,rand,weight=-abs(mat[0][1]))
 	G = G.to_undirected()
-	return G
+	return (nx.minimum_spanning_tree(G).to_undirected())
 
 #test
 
-ab = np.genfromtxt('../AB.dat',delimiter=",")
-ab = ab[:,1:]
+ab = np.genfromtxt('../SD.txt',delimiter=" ")
+ab = ab[:,:48]
 
-X=randomgraph(ab,len(ab),8)
-print(X.nodes())
+X=randomgraph(ab,len(ab),48)
+labels = (X.edges(data='weight'))
+print((labels))
 
 
 
