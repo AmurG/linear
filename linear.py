@@ -1,5 +1,7 @@
 import numpy as np
 import networkx as nx
+from sklearn.cluster import KMeans
+from scipy.spatial import distance
 
 #algo1 : random sampling from a datamatrix -> graph -> tree, no prior
 #no prior corresponds to uniform sampling which is proven to work ( see : Ghoshdastidar and dukkipatti )
@@ -83,7 +85,61 @@ def proximitygraph(datamat, nsam, ht, wd, alpha = 0.8):
 	G = G.to_undirected()
 	return (nx.minimum_spanning_tree(G).to_undirected())
 
-#algo3 : use arbit prior. The prior is compressed so that it's unspecified
+#algo3 : use arbit prior. The prior is compressed so that it's unspecified and does not incur quadratic cost.
+#To use this algo, specify a prior in the form of func(chosenidx,nsam) that outputs another idx in the form P(newidx|chosenidx)
+
+def genericgraph(datamat, nsam, nvar, prior):
+	order = np.random.permutation(nvar)
+	edgnum = int(np.rint(np.log(nvar)*np.log(nvar)+1))
+	G = nx.Graph()
+	for i in range(0,nvar):
+		G.add_node(i)
+	for idx in range(0,nvar):
+		curr = order[idx]
+		for i in range(0,edgnum):
+			rand = prior(idx, nsam)
+			while((rand==curr)or(G.has_edge(rand,curr))or(G.has_edge(curr,rand))):
+				rand = prior(idx, nsam)
+			G.add_edge(curr,rand,weight=-abs(helper(datamat[:,curr],datamat[:,rand])))
+	G = G.to_undirected()
+	return (nx.minimum_spanning_tree(G).to_undirected())
+
+#algo4 : Use unsupervised k-means to pre-cluster and obtain a prior on the variables to sample edges
+
+def kfoldaffinity(datamat,k,nsam,nvar):
+	kmeans = KMeans(n_clusters=k, random_state=0).fit(np.transpose(datamat))
+	arr = kmeans.cluster_centers_
+	labels = kmeans.labels_
+	mat = np.zeros(k*k)
+	mat = np.reshape(mat,(k,k))
+	sums = np.zeros(k)
+	for i in range(0,k):
+		for j in range(0,k):	
+			mat[i][j] = np.exp(-distance.euclidean(arr[i],arr[j]))
+			sums[i] = sums[i] + mat[i][j]
+	edgnum = int(np.rint(np.log(nvar)*np.log(nvar)+1))
+	G = nx.Graph()
+	for i in range(0,nvar):
+		G.add_node(i)
+	for idx in range(0,nvar):
+		label = int(labels[idx])
+		for i in range(0,edgnum):
+			draw = np.random.uniform(high=sums[label])
+			for j in range(0,k):
+				draw = draw - mat[label][j]
+				if(draw<=0):
+					pick = j
+					break
+			rand = np.random.randint(0,nvar)
+			while((rand==idx)or(G.has_edge(rand,idx))or(G.has_edge(idx,rand))or(labels[rand]!=pick)):
+				rand = np.random.randint(0,nvar)
+			G.add_edge(idx,rand,weight=-abs(helper(datamat[:,idx],datamat[:,rand])))
+	G = G.to_undirected()
+	return (nx.minimum_spanning_tree(G).to_undirected())
+				
+				
+
+
 
 			
 
